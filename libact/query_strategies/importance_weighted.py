@@ -10,7 +10,7 @@ from keras.optimizers import Nadam
 from keras.regularizers import l2
 from keras.layers import Input, Dense
 from sklearn.base import BaseEstimator
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 
 from libact.base.interfaces import QueryStrategy, ProbabilisticModel
 from libact.utils import inherit_docstring_from, seed_random_state, zip
@@ -23,6 +23,9 @@ class ImportanceWeighted(QueryStrategy):
     """Importance Weighted Active Learning Algorithm
 
     Support binary class and logistic regression only.
+    The original algorithm is in [1], however, its too slow for practical use.
+    This implementation is modified according with respect to the authors'
+    another paper [2].
 
     Parameters
     ----------
@@ -57,16 +60,19 @@ class ImportanceWeighted(QueryStrategy):
     .. [1] Beygelzimer, Alina, et al. "Agnostic active learning without
            constraints." Advances in Neural Information Processing Systems.
            2010.
+    .. [2] Karampatziakis, Nikos, and John Langford. "Online importance weight
+           aware updates." arXiv preprint arXiv:1011.1576 (2010).
 
-    .. [2] https://github.com/yyysbysb/al_log_icml18
+    .. [3] https://github.com/yyysbysb/al_log_icml18
 
-    .. [3] https://github.com/VowpalWabbit/vowpal_wabbit/blob/579c34d2d2fd151b419bea54d9921fc7f3f55bbc/vowpalwabbit/active.cc
+    .. [4] https://github.com/VowpalWabbit/vowpal_wabbit/blob/579c34d2d2fd151b419bea54d9921fc7f3f55bbc/vowpalwabbit/active.cc
     """
 
     def __init__(self, dataset, C0=8., c1=1., c2=1., random_state=None):
         super(ImportanceWeighted, self).__init__(dataset=dataset)
 
         X, y = dataset.format_sklearn()
+        y = LabelEncoder().fit_transform(y)
         lbl_enc = OneHotEncoder(sparse=False)
         lbl_enc.fit(y.reshape(-1, 1))
         self.model = LogisticRegressionKeras(
@@ -113,7 +119,7 @@ class ImportanceWeighted(QueryStrategy):
                 self._gen = self._query_generator()
                 continue
 
-            rng = self.random_state_.rand
+            rng = self.random_state_.rand()
             if rng <= p_k:
                 return ask_id, p_k
 
@@ -187,7 +193,7 @@ class ImportanceWeighted(QueryStrategy):
             else:
                 _temp = self.C0 * np.log(k+1) / k
             thresh = np.sqrt(_temp) + _temp
-            #print(gk, thresh, gk >= thresh)
+
             if gk <= thresh:
                 yield unlabeled_entry_ids[k], 1.
             else:

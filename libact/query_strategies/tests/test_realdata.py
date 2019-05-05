@@ -14,7 +14,8 @@ import numpy as np
 from libact.base.dataset import Dataset, import_libsvm_sparse
 from libact.models import LogisticRegression
 from libact.query_strategies import ActiveLearningByLearning, HintSVM,\
-    QueryByCommittee, QUIRE, RandomSampling, UncertaintySampling, DWUS
+    QueryByCommittee, QUIRE, RandomSampling, UncertaintySampling, DWUS, \
+    ImportanceWeighted
 from .utils import run_qs
 
 
@@ -151,6 +152,15 @@ class RealdataTestCase(unittest.TestCase):
                          np.concatenate([self.y[:10],
                                          [None] * (len(self.y) - 10)]))
         qs = DWUS(trn_ds, random_state=1126)
+        qseq = run_qs(trn_ds, qs, self.y, self.quota)
+        assert_array_equal(
+            qseq, np.array([30, 179, 104, 186, 28, 65, 142, 62, 257, 221]))
+
+    def test_ImportanceWeighted(self):
+        trn_ds = Dataset(self.X,
+                         np.concatenate([self.y[:10],
+                                         [None] * (len(self.y) - 10)]))
+        qs = ImportanceWeighted(trn_ds, random_state=1126)
         qseq = run_qs(trn_ds, qs, self.y, self.quota)
         assert_array_equal(
             qseq, np.array([30, 179, 104, 186, 28, 65, 142, 62, 257, 221]))

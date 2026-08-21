@@ -100,10 +100,15 @@ class UncertaintySampling(QueryStrategy):
         self.model.train(dataset)
         unlabeled_entry_ids, X_pool = dataset.get_unlabeled_entries()
 
+        if len(unlabeled_entry_ids) == 0:
+            return np.array([], dtype=int), np.array([], dtype=float)
+
         if isinstance(self.model, ProbabilisticModel):
             dvalue = self.model.predict_proba(X_pool)
         elif isinstance(self.model, ContinuousModel):
             dvalue = self.model.predict_real(X_pool)
+        else:
+            raise TypeError("model must be ContinuousModel or ProbabilisticModel")
 
         if self.method == 'lc':  # least confident
             score = -np.max(dvalue, axis=1)
@@ -116,7 +121,9 @@ class UncertaintySampling(QueryStrategy):
 
         elif self.method == 'entropy':
             score = np.sum(-dvalue * np.log(dvalue), axis=1)
-        return zip(unlabeled_entry_ids, score)
+        else:
+            raise ValueError("method must be 'lc', 'sm', or 'entropy'")
+        return np.asarray(unlabeled_entry_ids), np.asarray(score)
 
 
     def make_query(self, return_score=False):
@@ -134,10 +141,9 @@ class UncertaintySampling(QueryStrategy):
             Selection score of unlabled entries, the larger the better.
 
         """
-        dataset = self.dataset
-        # unlabeled_entry_ids, _ = dataset.get_unlabeled_entries()
-
-        unlabeled_entry_ids, scores = zip(*self._get_scores())
+        unlabeled_entry_ids, scores = self._get_scores()
+        if len(scores) == 0:
+            raise ValueError("No unlabeled samples available")
         ask_id = np.argmax(scores)
 
         if return_score:
